@@ -80,39 +80,49 @@ darkModeBtn.addEventListener('click', () => {
 
 // === Mic toggle ===
 stopListenBtn.addEventListener('click', () => {
-  if (isMicActive) {
-    stopMic();
-    isMicActive = false;
-    listenIcon.textContent = '🎤';
-    listenText.style.textDecoration = 'none';
-  } else {
-    startMic(
-      (fullMessage, meta) => {
-        if (typeof meta === 'object' && meta !== null) {
-          const { senderID, receiverID, messageID, hopCount, messageText } = meta;
-        } else return;
-
-        if (receiverID === deviceId) {
-          addRecvLog(`📩 From ${senderID}: "${messageText}"`);
-        } else if (monitorMode) {
-          addRecvLog(`🔁 Relayed: From ${senderID} to ${receiverID}: "${messageText}"`);
-        }
-
-        if (receiverID !== deviceId) {
-          meta.hop++;
-          sendMessage(`[${senderID}->${receiverID}#${messageID}|hop${meta.hop}] ${messageText}`, showSpeakerVolume);
-        }
-      },
-      () => { micError.style.display = 'block'; },
-      () => { micError.style.display = 'none'; },
-      visualizerCanvas
-    );
-
-    isMicActive = true;
-    listenIcon.textContent = '🔇';
-    listenText.style.textDecoration = 'line-through';
-  }
+    if (isMicActive) {
+      stopMic();
+      isMicActive = false;
+      listenIcon.textContent = '🎤';
+      listenText.style.textDecoration = 'none';
+    } else {
+      navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(() => {
+          micError.style.display = 'none';
+  
+          startMic(
+            (fullMessage, meta) => {
+              if (typeof meta === 'object' && meta !== null) {
+                const { senderID, receiverID, messageID, hopCount, messageText } = meta;
+              } else return;
+  
+              if (receiverID === deviceId || receiverID === 'broadcast') {
+                addRecvLog(`📩 From ${senderID}: "${messageText}"`);
+              } else if (monitorMode) {
+                addRecvLog(`🔁 Relayed: From ${senderID} to ${receiverID}: "${messageText}"`);
+              }
+  
+              if (receiverID !== deviceId) {
+                meta.hop++;
+                sendMessage(`[${senderID}->${receiverID}#${messageID}|hop${meta.hop}] ${messageText}`, showSpeakerVolume);
+              }
+            },
+            () => { micError.style.display = 'block'; },
+            () => { micError.style.display = 'none'; },
+            visualizerCanvas
+          );
+  
+          isMicActive = true;
+          listenIcon.textContent = '🔇';
+          listenText.style.textDecoration = 'line-through';
+        })
+        .catch(() => {
+          micError.style.display = 'block';
+          addRecvLog("🚫 Microphone access denied. Please allow mic access and try again.");
+        });
+    }
 });
+  
 
 // === Message handler ===
 function handleDecodedMessage(fullMessage) {
