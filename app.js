@@ -24,12 +24,10 @@ if (!deviceId) {
   localStorage.setItem('tempDeviceId', deviceId);
 }
 
-// Flush on tab close
 window.addEventListener('beforeunload', () => {
   localStorage.removeItem('tempDeviceId');
 });
 
-// Display device ID
 const deviceDisplay = document.getElementById('deviceIDDisplay');
 if (deviceDisplay) {
   deviceDisplay.textContent = deviceId;
@@ -80,28 +78,34 @@ darkModeBtn.addEventListener('click', () => {
 
 // === Mic toggle ===
 stopListenBtn.addEventListener('click', () => {
-    if (isMicActive) {
-      stopMic();
-      isMicActive = false;
-      listenIcon.textContent = '🎤';
-      listenText.style.textDecoration = 'none';
-    } else {
-      navigator.mediaDevices.getUserMedia({ audio: true })
-        .then(() => {
-          micError.style.display = 'none';
-  
-          startMic(
+  if (isMicActive) {
+    stopMic();
+    isMicActive = false;
+    listenIcon.textContent = '🎤';
+    listenText.style.textDecoration = 'none';
+  } else {
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(() => {
+        micError.style.display = 'none';
+
+        startMic(
             (fullMessage, meta) => {
+              console.log("📥 Decoded (raw):", fullMessage); // 👈 Add this line
+          
               if (typeof meta === 'object' && meta !== null) {
                 const { senderID, receiverID, messageID, hopCount, messageText } = meta;
-              } else return;
-  
+                console.log("📦 Decoded metadata:", meta); // 👈 Add this too
+              } else {
+                console.warn("⚠️ No valid meta info received.");
+                return;
+              }
+          
               if (receiverID === deviceId || receiverID === 'broadcast') {
                 addRecvLog(`📩 From ${senderID}: "${messageText}"`);
               } else if (monitorMode) {
                 addRecvLog(`🔁 Relayed: From ${senderID} to ${receiverID}: "${messageText}"`);
               }
-  
+          
               if (receiverID !== deviceId) {
                 meta.hop++;
                 sendMessage(`[${senderID}->${receiverID}#${messageID}|hop${meta.hop}] ${messageText}`, showSpeakerVolume);
@@ -111,41 +115,39 @@ stopListenBtn.addEventListener('click', () => {
               micError.style.display = 'block';
               micError.style.cursor = 'pointer';
               micError.title = 'Click to grant mic access';
-  
               micError.addEventListener('click', requestMicAccessOnce, { once: true });
             },
             () => { micError.style.display = 'none'; },
             visualizerCanvas
           );
-  
-          isMicActive = true;
-          listenIcon.textContent = '🔇';
-          listenText.style.textDecoration = 'line-through';
-        })
-        .catch(() => {
-          micError.style.display = 'block';
-          micError.style.cursor = 'pointer';
-          micError.title = 'Click to grant mic access';
-          addRecvLog("🚫 Microphone access denied. Please allow mic access and try again.");
-  
-          micError.addEventListener('click', requestMicAccessOnce, { once: true });
-        });
-    }
-});
-  
-  // Function to re-request mic access
-  function requestMicAccessOnce() {
-    navigator.mediaDevices.getUserMedia({ audio: true })
-      .then(() => {
-        micError.style.display = 'none';
-        if (!isMicActive) stopListenBtn.click(); // Try activating mic again
+          
+
+        isMicActive = true;
+        listenIcon.textContent = '🔇';
+        listenText.style.textDecoration = 'line-through';
       })
       .catch(() => {
-        alert("Microphone access is still blocked. Please enable it from your browser settings.");
+        micError.style.display = 'block';
+        micError.style.cursor = 'pointer';
+        micError.title = 'Click to grant mic access';
+        addRecvLog("🚫 Microphone access denied. Please allow mic access and try again.");
+
+        micError.addEventListener('click', requestMicAccessOnce, { once: true });
       });
+  }
+});
+
+// === Retry mic permission ===
+function requestMicAccessOnce() {
+  navigator.mediaDevices.getUserMedia({ audio: true })
+    .then(() => {
+      micError.style.display = 'none';
+      if (!isMicActive) stopListenBtn.click();
+    })
+    .catch(() => {
+      alert("Microphone access is still blocked. Please enable it from your browser settings.");
+    });
 }
-  
-  
 
 // === Message handler ===
 function handleDecodedMessage(fullMessage) {
@@ -163,7 +165,7 @@ function handleDecodedMessage(fullMessage) {
   const rebroadcast = `[${from}->${to}#${msgID}|hop${hopNum + 1}] ${msg}#`;
 
   if (to === deviceId || to === 'broadcast') {
-    addRecvLog(`From ${from}: ${msg}`);
+    addRecvLog(`📩 From ${from}: "${msg}"`);
   } else if (monitorMode && deviceId === 'Iam') {
     addRecvLog(`🔁 Relayed: From ${from} to ${to}: "${msg}"`);
   }

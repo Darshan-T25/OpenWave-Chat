@@ -18,15 +18,18 @@ function charToFreq(char) {
 }
 
 export function sendMessage(message, onVolume) {
+  const fullMessage = message + MESSAGE_TERMINATOR;
   let index = 0;
 
-  function playNextChar() {
-    if (index >= message.length) {
-      playTone(charToFreq(MESSAGE_TERMINATOR), 100);
-      return;
-    }
+  console.log("📤 Sending message:", fullMessage);
 
-    const freq = charToFreq(message[index]);
+  function playNextChar() {
+    if (index >= fullMessage.length) return;
+
+    const char = fullMessage[index];
+    const freq = charToFreq(char);
+    console.log(`📡 Sending '${char}' at ${freq.toFixed(1)} Hz`);
+
     playTone(freq, 100);
     index++;
     setTimeout(playNextChar, 120);

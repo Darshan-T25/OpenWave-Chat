@@ -1,4 +1,5 @@
 import { audioCtx } from './encoder.js';
+
 const baseFreq = 400;
 const step = 20;
 const MESSAGE_TERMINATOR = '#';
@@ -7,7 +8,10 @@ let silenceTimeout = null;
 
 function freqToChar(freq) {
   const code = Math.round((freq - baseFreq) / step);
-  return String.fromCharCode(code);
+  if (code >= 32 && code <= 126) {
+    return String.fromCharCode(code);
+  }
+  return ''; // Ignore out-of-range chars
 }
 
 let micStream = null;
@@ -65,11 +69,13 @@ function decodeMic(e, analyser, onDecoded) {
     const freq = (maxIndex * audioCtx.sampleRate) / analyser.fftSize / 2;
     const decodedChar = freqToChar(freq);
 
-    if (decodedChar >= ' ' && decodedChar <= '~') {
+    if (decodedChar) {
+      console.log(`🎵 Freq: ${freq.toFixed(1)} Hz → '${decodedChar}'`);
       incomingBuffer += decodedChar;
 
       if (decodedChar === MESSAGE_TERMINATOR) {
         const completeMsg = incomingBuffer;
+        console.log("📥 Decoded Message:", completeMsg);
         incomingBuffer = '';
         onDecoded(completeMsg);
       }
@@ -77,6 +83,7 @@ function decodeMic(e, analyser, onDecoded) {
       if (silenceTimeout) clearTimeout(silenceTimeout);
       silenceTimeout = setTimeout(() => {
         if (incomingBuffer.length > 0) {
+          console.log("⌛ Timeout - Partial Message:", incomingBuffer);
           onDecoded(incomingBuffer);
           incomingBuffer = '';
         }
