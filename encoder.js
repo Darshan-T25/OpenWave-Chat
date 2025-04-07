@@ -1,13 +1,13 @@
 export const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-const baseFreq = 620;
-const step = 12;
+const baseFreq = 400;              // Lower base frequency
+const step = 10;                   // Smaller step
 const MESSAGE_START = '~';
 const MESSAGE_END = '^';
 
-// Define characters you want to support
+// Define characters to support (make sure this set is identical in decoder.js)
 const CHAR_SET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789#|~^[](){}<>_-+=:;,.*@!? ';
 
-// Map each character to a frequency in the range 620–1480 Hz
+// Build a lookup map: character → frequency
 const charToFreqMap = {};
 CHAR_SET.split('').forEach((char, i) => {
   charToFreqMap[char] = baseFreq + (i * step);
@@ -25,6 +25,7 @@ if (myID === 'iam') localStorage.setItem('deviceId', 'Iam');
 
 export function sendMessage(message, onVolume) {
   // Wrap the message with start and end markers
+  // (Note: The caller should send the raw message; we add the markers here.)
   const fullMessage = MESSAGE_START + message + MESSAGE_END;
   let index = 0;
 
@@ -33,7 +34,6 @@ export function sendMessage(message, onVolume) {
   function playNextChar() {
     if (index >= fullMessage.length) return;
     const char = fullMessage[index];
-    // Use charToFreqMap instead of undefined CHAR_TO_FREQ
     const freq = charToFreqMap[char];
     if (freq) {
       console.log(`📡 Sending '${char}' at ${freq.toFixed(1)} Hz`);

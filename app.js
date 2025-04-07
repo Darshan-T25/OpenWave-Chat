@@ -24,12 +24,10 @@ if (!deviceId) {
   localStorage.setItem('tempDeviceId', deviceId);
 }
 
-// Flush on tab close
 window.addEventListener('beforeunload', () => {
   localStorage.removeItem('tempDeviceId');
 });
 
-// Display device ID
 const deviceDisplay = document.getElementById('deviceIDDisplay');
 if (deviceDisplay) {
   deviceDisplay.textContent = deviceId;
@@ -45,16 +43,14 @@ function generateMessageID() {
 }
 
 // === Send Message ===
-// Wrap message with start marker "~" and end marker "^"
+// Do NOT add markers here because encoder.js wraps message with start and end markers.
 sendBtn.addEventListener('click', () => {
   const msg = messageInput.value.trim();
   if (!msg) return;
 
   const receiver = prompt("Enter receiver ID (leave empty for broadcast):") || 'broadcast';
   const id = generateMessageID();
-  // Using "~" as start and "^" as end marker
-  const payload = `[${deviceId}->${receiver}#${id}|hop0] ${msg}`;
-  sendMessage(payload, showSpeakerVolume); // let encoder wrap with ~^  
+  const payload = `[${deviceId}->${receiver}#${id}|hop0] ` + msg; // raw message; encoder will add ~ and ^
 
   addSentLog(`To ${receiver}: ${msg}`);
   sendMessage(payload, showSpeakerVolume);
@@ -92,7 +88,6 @@ stopListenBtn.addEventListener('click', () => {
     navigator.mediaDevices.getUserMedia({ audio: true })
       .then(() => {
         micError.style.display = 'none';
-
         startMic(
           handleDecodedMessage,
           () => {
@@ -104,7 +99,6 @@ stopListenBtn.addEventListener('click', () => {
           () => { micError.style.display = 'none'; },
           visualizerCanvas
         );
-
         isMicActive = true;
         listenIcon.textContent = '🔇';
         listenText.style.textDecoration = 'line-through';
@@ -119,7 +113,6 @@ stopListenBtn.addEventListener('click', () => {
   }
 });
 
-// === Retry mic permission ===
 function requestMicAccessOnce() {
   navigator.mediaDevices.getUserMedia({ audio: true })
     .then(() => {
@@ -132,17 +125,15 @@ function requestMicAccessOnce() {
 }
 
 // === Message handler ===
-// Updated to look for start marker "~" and end marker "^"
 function handleDecodedMessage(fullMessage) {
   // Expect fullMessage like: "[sender->receiver#id|hop] ~message^"
   if (!fullMessage.includes(']')) return;
-
   const match = fullMessage.match(/\[([^\-]+)->([^\#]+)#([^\|]+)\|hop(\d+)\]\s?(.*)/);
   if (!match) return;
   const [_, from, to, msgID, hop, remainder] = match;
   // Look for start and end markers
-  const startIdx = remainder.indexOf('~');
-  const endIdx = remainder.indexOf('^');
+  const startIdx = remainder.indexOf(MESSAGE_START);
+  const endIdx = remainder.indexOf(MESSAGE_END);
   if (startIdx === -1 || endIdx === -1) return;
   const msg = remainder.substring(startIdx + 1, endIdx);
 
@@ -150,7 +141,7 @@ function handleDecodedMessage(fullMessage) {
   seenMessageIds.add(msgID);
 
   const hopNum = parseInt(hop);
-  const rebroadcast = `[${from}->${to}#${msgID}|hop${hopNum + 1}] ~${msg}^`;
+  const rebroadcast = `[${from}->${to}#${msgID}|hop${hopNum + 1}] ${MESSAGE_START}${msg}${MESSAGE_END}`;
 
   if (to === deviceId || to === 'broadcast') {
     addRecvLog(`From ${from}: ${msg}`);
@@ -189,7 +180,6 @@ window.addEventListener('DOMContentLoaded', () => {
   stopListenBtn.style.display = 'inline-flex';
   updateMonitorIcon();
   if (!isMicActive) stopListenBtn.click();
-  // Also display the device ID in the top-left (if deviceInfo element exists)
   const deviceInfoEl = document.getElementById('deviceIDDisplay');
   if (deviceInfoEl) {
     deviceInfoEl.textContent = deviceId;

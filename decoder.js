@@ -1,31 +1,30 @@
 import { audioCtx } from './encoder.js';
 
-const baseFreq = 620;
-const step = 12;
+const baseFreq = 400;              // Must match encoder.js!
+const step = 10;                   // Must match encoder.js!
 const MESSAGE_START = '~';
 const MESSAGE_END = '^';
 let incomingBuffer = '';
 let isReceiving = false;
 let silenceTimeout = null;
 
-// Character set must match encoder.js exactly
+// Use the same character set as in encoder.js
 const CHAR_SET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789#|~^[](){}<>_-+=:;,.*@!? ';
+// Build a reverse lookup map: frequency → character
 const freqToCharMap = {};
-
-// Build the frequency-to-character map
 CHAR_SET.split('').forEach((char, i) => {
   const freq = baseFreq + (i * step);
   freqToCharMap[Math.round(freq)] = char;
 });
 
-// Helper: get the closest character for a detected frequency within a tolerance of 10 Hz
+// Helper: get the closest character within a tolerance (±5 Hz)
 function getClosestChar(freq) {
   let minDiff = Infinity;
   let matchedChar = null;
   for (const [key, char] of Object.entries(freqToCharMap)) {
     const mappedFreq = Number(key);
     const diff = Math.abs(freq - mappedFreq);
-    if (diff < minDiff && diff <= 10) {
+    if (diff < minDiff && diff <= 5) {  // Tolerance of 5 Hz
       minDiff = diff;
       matchedChar = char;
     }
@@ -91,13 +90,14 @@ function decodeMic(e, analyser, onDecoded) {
     if (decodedChar) {
       console.log(`🎵 Freq: ${roundedFreq} Hz → '${decodedChar}'`);
       
-      // Check for start marker
+      // If start marker is detected, begin a new message.
       if (decodedChar === MESSAGE_START) {
         isReceiving = true;
         incomingBuffer = '';
         return;
       }
-      // Check for end marker
+      
+      // If end marker is detected, finish the message.
       if (decodedChar === MESSAGE_END) {
         isReceiving = false;
         console.log("📥 Decoded Message:", incomingBuffer);
@@ -105,7 +105,8 @@ function decodeMic(e, analyser, onDecoded) {
         incomingBuffer = '';
         return;
       }
-      // Buffer characters only if receiving has started
+      
+      // Append character if we are in receiving mode.
       if (isReceiving) {
         incomingBuffer += decodedChar;
       }
