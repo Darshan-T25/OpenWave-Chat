@@ -53,7 +53,8 @@ sendBtn.addEventListener('click', () => {
   const receiver = prompt("Enter receiver ID (leave empty for broadcast):") || 'broadcast';
   const id = generateMessageID();
   // Using "~" as start and "^" as end marker
-  const payload = `[${deviceId}->${receiver}#${id}|hop0] ~${msg}^`;
+  const payload = `[${deviceId}->${receiver}#${id}|hop0] ${msg}`;
+  sendMessage(payload, showSpeakerVolume); // let encoder wrap with ~^  
 
   addSentLog(`To ${receiver}: ${msg}`);
   sendMessage(payload, showSpeakerVolume);

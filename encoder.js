@@ -24,7 +24,7 @@ export const myID = localStorage.getItem('deviceId') || (() => {
 if (myID === 'iam') localStorage.setItem('deviceId', 'Iam');
 
 export function sendMessage(message, onVolume) {
-  const fullMessage = message + MESSAGE_END;
+  const fullMessage = MESSAGE_START + message + MESSAGE_END;
   let index = 0;
 
   console.log("📤 Sending message:", fullMessage);
