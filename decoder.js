@@ -12,10 +12,26 @@ let silenceTimeout = null;
 const CHAR_SET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789#|~^[](){}<>_-+=:;,.*@!? ';
 const freqToCharMap = {};
 
+// Build the frequency-to-character map
 CHAR_SET.split('').forEach((char, i) => {
   const freq = baseFreq + (i * step);
   freqToCharMap[Math.round(freq)] = char;
 });
+
+// Helper: get the closest character for a detected frequency within a tolerance of 10 Hz
+function getClosestChar(freq) {
+  let minDiff = Infinity;
+  let matchedChar = null;
+  for (const [key, char] of Object.entries(freqToCharMap)) {
+    const mappedFreq = Number(key);
+    const diff = Math.abs(freq - mappedFreq);
+    if (diff < minDiff && diff <= 10) {
+      minDiff = diff;
+      matchedChar = char;
+    }
+  }
+  return matchedChar;
+}
 
 let micStream = null;
 let analyser = null;
@@ -56,75 +72,56 @@ export function stopMic() {
   if (micStream) micStream.getTracks().forEach(t => t.stop());
 }
 
-export function decodeMic(onMessageDecoded) {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    const audioCtx = new AudioContext();
-    const analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 2048;
-    const micStream = new Uint8Array(analyser.frequencyBinCount);
-  
-    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-      const source = audioCtx.createMediaStreamSource(stream);
-      source.connect(analyser);
-  
-      let currentMessage = "";
-      let isReceiving = false;
-      let lastChar = "";
-  
-      function getClosestChar(freq) {
-        let minDiff = Infinity;
-        let matchedChar = null;
-        for (const [char, f] of Object.entries(CHAR_TO_FREQ)) {
-          const diff = Math.abs(freq - f);
-          if (diff < minDiff && diff <= 10) {
-            minDiff = diff;
-            matchedChar = char;
-          }
-        }
-        return matchedChar;
-      }
-  
-      function analyze() {
-        analyser.getByteFrequencyData(micStream);
-  
-        let maxAmp = 0, maxIndex = -1;
-        for (let i = 0; i < micStream.length; i++) {
-          if (micStream[i] > maxAmp) {
-            maxAmp = micStream[i];
-            maxIndex = i;
-          }
-        }
-  
-        const freq = maxIndex * (audioCtx.sampleRate / analyser.fftSize);
-        const char = getClosestChar(freq);
-  
-        if (char && char !== lastChar) {
-          lastChar = char;
-  
-          if (char === '~') {
-            isReceiving = true;
-            currentMessage = "";
-          } else if (char === '^' && isReceiving) {
-            isReceiving = false;
-            onMessageDecoded(currentMessage);
-          } else if (isReceiving) {
-            currentMessage += char;
-          }
-  
-          console.log(`🎵 ${Math.round(freq)} Hz → '${char}'`);
-        }
-  
-        requestAnimationFrame(analyze);
-      }
-  
-      analyze();
-    }).catch(err => {
-      console.error('Mic error:', err);
-      const errorEl = document.getElementById('mic-error');
-      if (errorEl) errorEl.innerText = 'Mic access denied';
-    });
+function decodeMic(e, analyser, onDecoded) {
+  const dataArray = new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteFrequencyData(dataArray);
+
+  let maxVal = 0, maxIndex = 0;
+  for (let i = 0; i < dataArray.length; i++) {
+    if (dataArray[i] > maxVal) {
+      maxVal = dataArray[i];
+      maxIndex = i;
+    }
   }
-  
+
+  if (maxVal > 150) {
+    const detectedFreq = (maxIndex * audioCtx.sampleRate) / analyser.fftSize / 2;
+    const roundedFreq = Math.round(detectedFreq);
+    const decodedChar = getClosestChar(roundedFreq);
+    if (decodedChar) {
+      console.log(`🎵 Freq: ${roundedFreq} Hz → '${decodedChar}'`);
+      
+      // Check for start marker
+      if (decodedChar === MESSAGE_START) {
+        isReceiving = true;
+        incomingBuffer = '';
+        return;
+      }
+      // Check for end marker
+      if (decodedChar === MESSAGE_END) {
+        isReceiving = false;
+        console.log("📥 Decoded Message:", incomingBuffer);
+        onDecoded(incomingBuffer);
+        incomingBuffer = '';
+        return;
+      }
+      // Buffer characters only if receiving has started
+      if (isReceiving) {
+        incomingBuffer += decodedChar;
+      }
+      
+      if (silenceTimeout) clearTimeout(silenceTimeout);
+      silenceTimeout = setTimeout(() => {
+        if (incomingBuffer.length > 0) {
+          console.log("⌛ Timeout - Partial Message:", incomingBuffer);
+          onDecoded(incomingBuffer);
+          incomingBuffer = '';
+          isReceiving = false;
+        }
+      }, 2000);
+    }
+  }
+}
 
 function initVisualizer(analyser, canvas) {
   const ctx = canvas.getContext('2d');
