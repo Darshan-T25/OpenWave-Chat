@@ -107,7 +107,13 @@ stopListenBtn.addEventListener('click', () => {
                 sendMessage(`[${senderID}->${receiverID}#${messageID}|hop${meta.hop}] ${messageText}`, showSpeakerVolume);
               }
             },
-            () => { micError.style.display = 'block'; },
+            () => {
+              micError.style.display = 'block';
+              micError.style.cursor = 'pointer';
+              micError.title = 'Click to grant mic access';
+  
+              micError.addEventListener('click', requestMicAccessOnce, { once: true });
+            },
             () => { micError.style.display = 'none'; },
             visualizerCanvas
           );
@@ -118,10 +124,27 @@ stopListenBtn.addEventListener('click', () => {
         })
         .catch(() => {
           micError.style.display = 'block';
+          micError.style.cursor = 'pointer';
+          micError.title = 'Click to grant mic access';
           addRecvLog("🚫 Microphone access denied. Please allow mic access and try again.");
+  
+          micError.addEventListener('click', requestMicAccessOnce, { once: true });
         });
     }
 });
+  
+  // Function to re-request mic access
+  function requestMicAccessOnce() {
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(() => {
+        micError.style.display = 'none';
+        if (!isMicActive) stopListenBtn.click(); // Try activating mic again
+      })
+      .catch(() => {
+        alert("Microphone access is still blocked. Please enable it from your browser settings.");
+      });
+}
+  
   
 
 // === Message handler ===
