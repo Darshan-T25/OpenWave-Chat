@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>OpenWave Chat</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="deviceInfo" style="position: fixed; top: 10px; left: 10px; background: #222; color: #0f0; padding: 6px 10px; border-radius: 8px; font-size: 14px; z-index: 1000;">
+    Device: <span id="deviceIDDisplay">...</span>
+  </div>      
+  <h1>👽 OpenWave Chat</h1>
+
+  <!-- Container with top headings for logs -->
+  <div class="logs-header">
+    <div>Sent Logs</div>
+    <div>Received Logs</div>
+  </div>
+
+  <!-- Two logs side by side under the headings -->
+  <div class="logs-container">
+    <ul id="sentLog" class="log"></ul>
+    <ul id="recvLog" class="log"></ul>
+  </div>
+
+  <!-- Black area (visualizer) in the middle -->
+  <canvas id="visualizer" width="600" height="200"></canvas>
+
+  <!-- Input row at the bottom -->
+  <div class="input">
+    <input type="text" id="messageInput" placeholder="Enter message..." />
+    <button id="sendBtn">Send</button>
+    <button id="darkModeBtn">👽</button>
+    <div id="volumeLevel" style="margin-top: 10px; font-size: 14px;"></div>
+    <p id="micError" style="color:red; display:none; text-align: center;">Mic access denied.</p>
+
+    <!-- Toggle listening button -->
+    <button id="stopListenBtn" style="display: none;">
+      <span id="listenIcon">🔇</span>
+      <span id="listenText" style="text-decoration: line-through;">Listening</span>
+      <span id="monitorIcon" class="monitor-icon" style="display: none;">🕹️</span>
+    </button>
+  </div>
+
+  <div id="darkModeMsg">🌑----Going Dark👽----🌑</div>
+
+  <!-- ✅ Use module type for script -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>
