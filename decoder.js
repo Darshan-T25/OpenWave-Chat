@@ -1,20 +1,21 @@
 import { audioCtx } from './encoder.js';
 
-const baseFreq = 400;
-const step = 20;
+const baseFreq = 620;
+const step = 12;
 const MESSAGE_START = '~';
 const MESSAGE_END = '^';
 let incomingBuffer = '';
 let isReceiving = false;
 let silenceTimeout = null;
 
-function freqToChar(freq) {
-  const code = Math.round((freq - baseFreq) / step);
-  if (code >= 32 && code <= 126) {
-    return String.fromCharCode(code);
-  }
-  return '';
-}
+// Character set must match encoder.js exactly
+const CHAR_SET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789#|~^[](){}<>_-+=:;,.*@!? ';
+const freqToCharMap = {};
+
+CHAR_SET.split('').forEach((char, i) => {
+  const freq = baseFreq + (i * step);
+  freqToCharMap[Math.round(freq)] = char;
+});
 
 let micStream = null;
 let analyser = null;
@@ -68,18 +69,20 @@ function decodeMic(e, analyser, onDecoded) {
   }
 
   if (maxVal > 150) {
-    const freq = (maxIndex * audioCtx.sampleRate) / analyser.fftSize / 2;
-    const decodedChar = freqToChar(freq);
+    const detectedFreq = (maxIndex * audioCtx.sampleRate) / analyser.fftSize / 2;
+    const roundedFreq = Math.round(detectedFreq);
 
+    // Match to nearest known frequency
+    const decodedChar = freqToCharMap[roundedFreq];
     if (decodedChar) {
-      console.log(`🎵 Freq: ${freq.toFixed(1)} Hz → '${decodedChar}'`);
-      // Check for start marker
+      console.log(`🎵 Freq: ${roundedFreq} Hz → '${decodedChar}'`);
+
       if (decodedChar === MESSAGE_START) {
         isReceiving = true;
         incomingBuffer = '';
         return;
       }
-      // Check for end marker
+
       if (decodedChar === MESSAGE_END) {
         isReceiving = false;
         console.log("📥 Decoded Message:", incomingBuffer);
@@ -87,11 +90,11 @@ function decodeMic(e, analyser, onDecoded) {
         incomingBuffer = '';
         return;
       }
-      // Buffer characters only if receiving has started
+
       if (isReceiving) {
         incomingBuffer += decodedChar;
       }
-      
+
       if (silenceTimeout) clearTimeout(silenceTimeout);
       silenceTimeout = setTimeout(() => {
         if (incomingBuffer.length > 0) {

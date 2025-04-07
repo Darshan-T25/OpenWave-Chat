@@ -1,26 +1,30 @@
 export const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-const baseFreq = 400;
-const step = 20;
+const baseFreq = 620;
+const step = 12;
 const MESSAGE_START = '~';
 const MESSAGE_END = '^';
 
-// Unique ID for this device (stored under 'deviceId')
+// Define characters you want to support
+const CHAR_SET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789#|~^[](){}<>_-+=:;,.*@!? ';
+
+// Map each character to a frequency in range 620–1480 Hz
+const charToFreqMap = {};
+CHAR_SET.split('').forEach((char, i) => {
+  charToFreqMap[char] = baseFreq + (i * step);
+});
+
+// Unique ID
 export const myID = localStorage.getItem('deviceId') || (() => {
   const id = Math.random().toString(36).substring(2, 8);
   localStorage.setItem('deviceId', id);
   return id;
 })();
 
-// Override if you’re the chosen one (if myID equals 'iam', then set to 'Iam')
+// Special mode
 if (myID === 'iam') localStorage.setItem('deviceId', 'Iam');
 
-function charToFreq(char) {
-  return baseFreq + (char.charCodeAt(0) * step);
-}
-
 export function sendMessage(message, onVolume) {
-  // Wrap the message with start and end markers
-  const fullMessage = message + MESSAGE_END; // Note: your sendMessage caller should already add MESSAGE_START
+  const fullMessage = message + MESSAGE_END;
   let index = 0;
 
   console.log("📤 Sending message:", fullMessage);
@@ -28,9 +32,15 @@ export function sendMessage(message, onVolume) {
   function playNextChar() {
     if (index >= fullMessage.length) return;
     const char = fullMessage[index];
-    const freq = charToFreq(char);
-    console.log(`📡 Sending '${char}' at ${freq.toFixed(1)} Hz`);
-    playTone(freq, 100);
+    const freq = charToFreqMap[char];
+
+    if (freq) {
+      console.log(`📡 Sending '${char}' at ${freq.toFixed(1)} Hz`);
+      playTone(freq, 100);
+    } else {
+      console.warn(`⚠️ Unsupported character: '${char}'`);
+    }
+
     index++;
     setTimeout(playNextChar, 120);
   }
