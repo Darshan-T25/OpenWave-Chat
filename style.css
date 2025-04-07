@@ -19,14 +19,6 @@ h1 {
     margin: 0 auto;
 }
 
-#visualizer {
-    display: block;
-    margin: 20px auto;
-    background: #222;
-    border-radius: 10px;
-    max-width: 600px;
-}
-
 .logs-container {
     display: flex;
     justify-content: center;
@@ -53,6 +45,14 @@ h1 {
     border-radius: 5px;
     font-family: monospace;
     word-break: break-word;
+}
+
+#visualizer {
+    display: block;
+    margin: 20px auto;
+    background: #222;
+    border-radius: 10px;
+    max-width: 600px;
 }
 
 .input {
@@ -86,7 +86,6 @@ button#sendBtn:hover {
     background-color: #0056b3;
 }
 
-/* 👽 Modern Dark Mode Toggle Button */
 #darkModeBtn {
     padding: 8px 12px;
     font-size: 1.3rem;
@@ -105,7 +104,6 @@ button#sendBtn:hover {
     transform: scale(1.05);
 }
 
-/* Dark Mode Theme */
 body.dark {
     background-color: #121212;
     color: #e0e0e0;
@@ -137,7 +135,6 @@ body.dark #darkModeBtn {
     box-shadow: 0 4px 10px rgba(255, 255, 255, 0.1);
 }
 
-/* 🎬 "Going Dark" Message Animation */
 #darkModeMsg {
     display: none;
     position: fixed;
@@ -190,7 +187,6 @@ body.dark #stopListenBtn {
     color: #900;
 }
 
-/* 🔇 Animated listening icon */
 .monitor-icon {
   font-size: 18px;
   margin-left: 8px;

@@ -1,6 +1,7 @@
 import { sendMessage, myID } from './encoder.js';
 import { startMic, stopMic } from './decoder.js';
 import { addSentLog, addRecvLog, showMonitorIcon, hideMonitorIcon } from './visualizer.js';
+import { MESSAGE_START, MESSAGE_END } from './utils.js';
 
 const messageInput = document.getElementById('messageInput');
 const sendBtn = document.getElementById('sendBtn');
@@ -17,17 +18,14 @@ const visualizerCanvas = document.getElementById('visualizer');
 function generateDeviceId() {
   return Math.random().toString(36).substring(2, 7).toUpperCase();
 }
-
 let deviceId = localStorage.getItem('tempDeviceId');
 if (!deviceId) {
   deviceId = generateDeviceId();
   localStorage.setItem('tempDeviceId', deviceId);
 }
-
 window.addEventListener('beforeunload', () => {
   localStorage.removeItem('tempDeviceId');
 });
-
 const deviceDisplay = document.getElementById('deviceIDDisplay');
 if (deviceDisplay) {
   deviceDisplay.textContent = deviceId;
@@ -43,15 +41,14 @@ function generateMessageID() {
 }
 
 // === Send Message ===
-// Do NOT add markers here because encoder.js wraps message with start and end markers.
+// Note: Do NOT wrap the raw message here because encoder.js wraps it.
 sendBtn.addEventListener('click', () => {
   const msg = messageInput.value.trim();
   if (!msg) return;
-
   const receiver = prompt("Enter receiver ID (leave empty for broadcast):") || 'broadcast';
   const id = generateMessageID();
-  const payload = `[${deviceId}->${receiver}#${id}|hop0] ` + msg; // raw message; encoder will add ~ and ^
-
+  // Construct header; encoder.js will add the start/end markers.
+  const payload = `[${deviceId}->${receiver}#${id}|hop0] ` + msg;
   addSentLog(`To ${receiver}: ${msg}`);
   sendMessage(payload, showSpeakerVolume);
   messageInput.value = '';
@@ -66,7 +63,6 @@ darkModeBtn.addEventListener('click', () => {
   const wasDark = document.body.classList.contains('dark');
   isDark = !isDark;
   document.body.classList.toggle('dark', isDark);
-
   if (!wasDark && isDark) {
     darkModeMsg.style.display = 'block';
     darkModeMsg.classList.add('fadeOut');
@@ -125,30 +121,31 @@ function requestMicAccessOnce() {
 }
 
 // === Message handler ===
+// Expected format: "[sender->receiver#id|hop] rawMessage"
+// Decoder (in decoder.js) returns only the raw message (without start/end markers).
 function handleDecodedMessage(fullMessage) {
-  // Expect fullMessage like: "[sender->receiver#id|hop] ~message^"
   if (!fullMessage.includes(']')) return;
   const match = fullMessage.match(/\[([^\-]+)->([^\#]+)#([^\|]+)\|hop(\d+)\]\s?(.*)/);
   if (!match) return;
   const [_, from, to, msgID, hop, remainder] = match;
-  // Look for start and end markers
+  // Extract message between MESSAGE_START and MESSAGE_END
   const startIdx = remainder.indexOf(MESSAGE_START);
   const endIdx = remainder.indexOf(MESSAGE_END);
   if (startIdx === -1 || endIdx === -1) return;
   const msg = remainder.substring(startIdx + 1, endIdx);
-
+  
   if (seenMessageIds.has(msgID)) return;
   seenMessageIds.add(msgID);
-
+  
   const hopNum = parseInt(hop);
   const rebroadcast = `[${from}->${to}#${msgID}|hop${hopNum + 1}] ${MESSAGE_START}${msg}${MESSAGE_END}`;
-
+  
   if (to === deviceId || to === 'broadcast') {
     addRecvLog(`From ${from}: ${msg}`);
   } else if (monitorMode && deviceId === 'Iam') {
     addRecvLog(`🔁 Relayed: From ${from} to ${to}: "${msg}"`);
   }
-
+  
   if (to !== deviceId) {
     sendMessage(rebroadcast, showSpeakerVolume);
   }
@@ -163,7 +160,6 @@ document.addEventListener('keydown', (e) => {
     addRecvLog(`🕹️ Monitor mode ${monitorMode ? 'enabled' : 'disabled'}`);
   }
 });
-
 function updateMonitorIcon() {
   let icon = document.getElementById('monitorIcon');
   if (!icon) {

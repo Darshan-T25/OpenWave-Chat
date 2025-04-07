@@ -1,36 +1,11 @@
 import { audioCtx } from './encoder.js';
+import { MESSAGE_START, MESSAGE_END, getClosestChar } from './utils.js';
 
-const baseFreq = 400;              // Must match encoder.js!
-const step = 10;                   // Must match encoder.js!
-const MESSAGE_START = '~';
-const MESSAGE_END = '^';
+const baseFreq = 400;
+const step = 10;
 let incomingBuffer = '';
 let isReceiving = false;
 let silenceTimeout = null;
-
-// Use the same character set as in encoder.js
-const CHAR_SET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789#|~^[](){}<>_-+=:;,.*@!? ';
-// Build a reverse lookup map: frequency → character
-const freqToCharMap = {};
-CHAR_SET.split('').forEach((char, i) => {
-  const freq = baseFreq + (i * step);
-  freqToCharMap[Math.round(freq)] = char;
-});
-
-// Helper: get the closest character within a tolerance (±5 Hz)
-function getClosestChar(freq) {
-  let minDiff = Infinity;
-  let matchedChar = null;
-  for (const [key, char] of Object.entries(freqToCharMap)) {
-    const mappedFreq = Number(key);
-    const diff = Math.abs(freq - mappedFreq);
-    if (diff < minDiff && diff <= 5) {  // Tolerance of 5 Hz
-      minDiff = diff;
-      matchedChar = char;
-    }
-  }
-  return matchedChar;
-}
 
 let micStream = null;
 let analyser = null;
@@ -74,7 +49,7 @@ export function stopMic() {
 function decodeMic(e, analyser, onDecoded) {
   const dataArray = new Uint8Array(analyser.frequencyBinCount);
   analyser.getByteFrequencyData(dataArray);
-
+  
   let maxVal = 0, maxIndex = 0;
   for (let i = 0; i < dataArray.length; i++) {
     if (dataArray[i] > maxVal) {
@@ -82,7 +57,7 @@ function decodeMic(e, analyser, onDecoded) {
       maxIndex = i;
     }
   }
-
+  
   if (maxVal > 150) {
     const detectedFreq = (maxIndex * audioCtx.sampleRate) / analyser.fftSize / 2;
     const roundedFreq = Math.round(detectedFreq);
@@ -90,14 +65,12 @@ function decodeMic(e, analyser, onDecoded) {
     if (decodedChar) {
       console.log(`🎵 Freq: ${roundedFreq} Hz → '${decodedChar}'`);
       
-      // If start marker is detected, begin a new message.
       if (decodedChar === MESSAGE_START) {
         isReceiving = true;
         incomingBuffer = '';
         return;
       }
       
-      // If end marker is detected, finish the message.
       if (decodedChar === MESSAGE_END) {
         isReceiving = false;
         console.log("📥 Decoded Message:", incomingBuffer);
@@ -106,7 +79,6 @@ function decodeMic(e, analyser, onDecoded) {
         return;
       }
       
-      // Append character if we are in receiving mode.
       if (isReceiving) {
         incomingBuffer += decodedChar;
       }
