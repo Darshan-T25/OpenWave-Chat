@@ -24,10 +24,12 @@ if (!deviceId) {
   localStorage.setItem('tempDeviceId', deviceId);
 }
 
+// Flush on tab close
 window.addEventListener('beforeunload', () => {
   localStorage.removeItem('tempDeviceId');
 });
 
+// Display device ID
 const deviceDisplay = document.getElementById('deviceIDDisplay');
 if (deviceDisplay) {
   deviceDisplay.textContent = deviceId;
@@ -43,13 +45,15 @@ function generateMessageID() {
 }
 
 // === Send Message ===
+// Wrap message with start marker "~" and end marker "^"
 sendBtn.addEventListener('click', () => {
   const msg = messageInput.value.trim();
   if (!msg) return;
 
   const receiver = prompt("Enter receiver ID (leave empty for broadcast):") || 'broadcast';
   const id = generateMessageID();
-  const payload = `[${deviceId}->${receiver}#${id}|hop0] ${msg}#`;
+  // Using "~" as start and "^" as end marker
+  const payload = `[${deviceId}->${receiver}#${id}|hop0] ~${msg}^`;
 
   addSentLog(`To ${receiver}: ${msg}`);
   sendMessage(payload, showSpeakerVolume);
@@ -89,38 +93,16 @@ stopListenBtn.addEventListener('click', () => {
         micError.style.display = 'none';
 
         startMic(
-            (fullMessage, meta) => {
-              console.log("📥 Decoded (raw):", fullMessage); // 👈 Add this line
-          
-              if (typeof meta === 'object' && meta !== null) {
-                const { senderID, receiverID, messageID, hopCount, messageText } = meta;
-                console.log("📦 Decoded metadata:", meta); // 👈 Add this too
-              } else {
-                console.warn("⚠️ No valid meta info received.");
-                return;
-              }
-          
-              if (receiverID === deviceId || receiverID === 'broadcast') {
-                addRecvLog(`📩 From ${senderID}: "${messageText}"`);
-              } else if (monitorMode) {
-                addRecvLog(`🔁 Relayed: From ${senderID} to ${receiverID}: "${messageText}"`);
-              }
-          
-              if (receiverID !== deviceId) {
-                meta.hop++;
-                sendMessage(`[${senderID}->${receiverID}#${messageID}|hop${meta.hop}] ${messageText}`, showSpeakerVolume);
-              }
-            },
-            () => {
-              micError.style.display = 'block';
-              micError.style.cursor = 'pointer';
-              micError.title = 'Click to grant mic access';
-              micError.addEventListener('click', requestMicAccessOnce, { once: true });
-            },
-            () => { micError.style.display = 'none'; },
-            visualizerCanvas
-          );
-          
+          handleDecodedMessage,
+          () => {
+            micError.style.display = 'block';
+            micError.style.cursor = 'pointer';
+            micError.title = 'Click to grant mic access';
+            micError.addEventListener('click', requestMicAccessOnce, { once: true });
+          },
+          () => { micError.style.display = 'none'; },
+          visualizerCanvas
+        );
 
         isMicActive = true;
         listenIcon.textContent = '🔇';
@@ -131,7 +113,6 @@ stopListenBtn.addEventListener('click', () => {
         micError.style.cursor = 'pointer';
         micError.title = 'Click to grant mic access';
         addRecvLog("🚫 Microphone access denied. Please allow mic access and try again.");
-
         micError.addEventListener('click', requestMicAccessOnce, { once: true });
       });
   }
@@ -150,22 +131,28 @@ function requestMicAccessOnce() {
 }
 
 // === Message handler ===
+// Updated to look for start marker "~" and end marker "^"
 function handleDecodedMessage(fullMessage) {
+  // Expect fullMessage like: "[sender->receiver#id|hop] ~message^"
   if (!fullMessage.includes(']')) return;
 
-  const match = fullMessage.match(/\[([^\-]+)->([^\#]+)#([^\|]+)\|hop(\d+)\]\s?(.+)#/);
+  const match = fullMessage.match(/\[([^\-]+)->([^\#]+)#([^\|]+)\|hop(\d+)\]\s?(.*)/);
   if (!match) return;
-
-  const [_, from, to, msgID, hop, msg] = match;
+  const [_, from, to, msgID, hop, remainder] = match;
+  // Look for start and end markers
+  const startIdx = remainder.indexOf('~');
+  const endIdx = remainder.indexOf('^');
+  if (startIdx === -1 || endIdx === -1) return;
+  const msg = remainder.substring(startIdx + 1, endIdx);
 
   if (seenMessageIds.has(msgID)) return;
   seenMessageIds.add(msgID);
 
   const hopNum = parseInt(hop);
-  const rebroadcast = `[${from}->${to}#${msgID}|hop${hopNum + 1}] ${msg}#`;
+  const rebroadcast = `[${from}->${to}#${msgID}|hop${hopNum + 1}] ~${msg}^`;
 
   if (to === deviceId || to === 'broadcast') {
-    addRecvLog(`📩 From ${from}: "${msg}"`);
+    addRecvLog(`From ${from}: ${msg}`);
   } else if (monitorMode && deviceId === 'Iam') {
     addRecvLog(`🔁 Relayed: From ${from} to ${to}: "${msg}"`);
   }
@@ -175,7 +162,7 @@ function handleDecodedMessage(fullMessage) {
   }
 }
 
-// === Monitor mode (Shift + M) ===
+// === Monitor mode toggle (Shift + M) ===
 document.addEventListener('keydown', (e) => {
   if (deviceId === 'Iam' && e.shiftKey && e.key.toLowerCase() === 'm') {
     monitorMode = !monitorMode;
@@ -201,4 +188,9 @@ window.addEventListener('DOMContentLoaded', () => {
   stopListenBtn.style.display = 'inline-flex';
   updateMonitorIcon();
   if (!isMicActive) stopListenBtn.click();
+  // Also display the device ID in the top-left (if deviceInfo element exists)
+  const deviceInfoEl = document.getElementById('deviceIDDisplay');
+  if (deviceInfoEl) {
+    deviceInfoEl.textContent = deviceId;
+  }
 });

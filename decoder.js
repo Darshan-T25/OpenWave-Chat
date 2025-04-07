@@ -2,8 +2,10 @@ import { audioCtx } from './encoder.js';
 
 const baseFreq = 400;
 const step = 20;
-const MESSAGE_TERMINATOR = '#';
+const MESSAGE_START = '~';
+const MESSAGE_END = '^';
 let incomingBuffer = '';
+let isReceiving = false;
 let silenceTimeout = null;
 
 function freqToChar(freq) {
@@ -11,7 +13,7 @@ function freqToChar(freq) {
   if (code >= 32 && code <= 126) {
     return String.fromCharCode(code);
   }
-  return ''; // Ignore out-of-range chars
+  return '';
 }
 
 let micStream = null;
@@ -71,21 +73,32 @@ function decodeMic(e, analyser, onDecoded) {
 
     if (decodedChar) {
       console.log(`🎵 Freq: ${freq.toFixed(1)} Hz → '${decodedChar}'`);
-      incomingBuffer += decodedChar;
-
-      if (decodedChar === MESSAGE_TERMINATOR) {
-        const completeMsg = incomingBuffer;
-        console.log("📥 Decoded Message:", completeMsg);
+      // Check for start marker
+      if (decodedChar === MESSAGE_START) {
+        isReceiving = true;
         incomingBuffer = '';
-        onDecoded(completeMsg);
+        return;
       }
-
+      // Check for end marker
+      if (decodedChar === MESSAGE_END) {
+        isReceiving = false;
+        console.log("📥 Decoded Message:", incomingBuffer);
+        onDecoded(incomingBuffer);
+        incomingBuffer = '';
+        return;
+      }
+      // Buffer characters only if receiving has started
+      if (isReceiving) {
+        incomingBuffer += decodedChar;
+      }
+      
       if (silenceTimeout) clearTimeout(silenceTimeout);
       silenceTimeout = setTimeout(() => {
         if (incomingBuffer.length > 0) {
           console.log("⌛ Timeout - Partial Message:", incomingBuffer);
           onDecoded(incomingBuffer);
           incomingBuffer = '';
+          isReceiving = false;
         }
       }, 2000);
     }
